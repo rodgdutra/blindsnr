@@ -40,7 +40,7 @@ def convert_audio(
                     output_file, "wb"
                 ) as f_out:
                     f_out.write(f_in.read())
-                logger.info("No audio conversion needed. Copying file.")
+                logger.debug("No audio conversion needed. Copying file.")
                 return
 
             # Basic conversion using wave module (limited capabilities)
@@ -78,12 +78,30 @@ def convert_audio(
         logger.error(f"Error processing audio: {e}")
         return None
 
+def check_conversion_needed(input_file,  target_sample_rate=16000,
+    target_channels=1,
+    target_sample_width=2):
+    with wave.open(input_file, "rb") as wf_in:
+        frame_rate = wf_in.getframerate()
+        channels = wf_in.getnchannels()
+        sample_width = wf_in.getsampwidth()  # Bytes per sample
+
+        # Check if conversion is needed
+        if (
+            frame_rate == target_sample_rate
+            and channels == target_channels
+            and sample_width == target_sample_width
+        ):
+            logger.debug("No audio conversion needed. Copying file.")
+            return False
+        return True
+
 def run_wada_snr(audio_file_path, wada_snr_exe_path="WadaSNR/Exe/WADASNR", table_file="WadaSNR/Table/Alpha0.400000.txt", input_file_format="nist"):
     """
     Runs the Original WADA SNR executable with the given audio file.
     The source code must be donwloaded from the link:
     http://www.cs.cmu.edu/~robust/archive/algorithms/WADA_SNR_IS_2008/WadaSNR.tar.gz
-    
+
 
     Args:
         audio_file_path (str): Path to the audio file.
@@ -95,13 +113,15 @@ def run_wada_snr(audio_file_path, wada_snr_exe_path="WadaSNR/Exe/WADASNR", table
         subprocess.CompletedProcess: The result of the subprocess call, or None if an error occurred.
     """
     try:
+        temp_audio_file = audio_file_path
         # Create a temporary file for the converted audio
-        temp_audio_file = (
+        if check_conversion_needed(audio_file_path):
+            temp_audio_file = (
             f"temp_audio_{hashlib.sha256(audio_file_path.encode()).hexdigest()}.wav"
-        )
-        logger.info("Converting audio")
-        convert_audio(audio_file_path, temp_audio_file)
-        logger.info("Done converting audio")
+            )
+            logger.debug("Converting audio")
+            convert_audio(audio_file_path, temp_audio_file)
+            logger.debug("Done converting audio")
 
         # Construct the command
         command = [
@@ -119,8 +139,9 @@ def run_wada_snr(audio_file_path, wada_snr_exe_path="WadaSNR/Exe/WADASNR", table
         result = subprocess.run(command, capture_output=True, text=True)
 
         # Clean up the temporary file
-        os.remove(temp_audio_file)
-        logger.info("Temporary audio file deleted.")
+        if temp_audio_file != audio_file_path:
+            os.remove(temp_audio_file)
+        logger.debug("Temporary audio file deleted.")
 
         return result
 
@@ -145,7 +166,7 @@ def process_wada_result(result):
     snr_value = np.nan
     if snr_match:
         snr_value = float(snr_match.group(1))
-        logger.info(f"Extracted SNR Value: {snr_value} dB")
+        logger.debug(f"Extracted SNR Value: {snr_value} dB")
     else:
         logger.warning("SNR value not found in WADASNR output.")
     return snr_value
@@ -180,6 +201,6 @@ if __name__ == "__main__":
     snr_value = wada_original(audio_file)
 
     if not np.isnan(snr_value):
-        logger.info(f"Final SNR Value: {snr_value} dB")
+        logger.debug(f"Final SNR Value: {snr_value} dB")
     else:
         logger.error("Failed to extract SNR value.")

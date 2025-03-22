@@ -32,7 +32,7 @@ The python implementation in wada_simplified was originally implemented here: ht
 the author is @peter-grajcar.
 """
 
-def wada_alternative(signal, sampling_rate=16000):
+def wada_alternative(noisy_wav, sampling_rate=16000):
     """
     Estimate SNR using the WADA-SNR algorithm.
     
@@ -43,8 +43,9 @@ def wada_alternative(signal, sampling_rate=16000):
     Returns:
         float: Estimated SNR in dB.
     """
+    noisy_wav = sf.read(noisy_wav)[0]
     # Step 1: Compute the absolute amplitude of the signal
-    abs_signal = np.abs(signal)
+    abs_signal = np.abs(noisy_wav)
     
     # Step 2: Define the Gamma distribution for clean speech
     def gamma_pdf(x, shape, scale):
