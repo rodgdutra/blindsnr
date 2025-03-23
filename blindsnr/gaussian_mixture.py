@@ -3,7 +3,7 @@ from scipy.stats import norm
 from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 import soundfile as sf
-
+from .utils import read_audio
 
 def compute_log_power(signal, frame_length=128, hop_length=64):
     """
@@ -60,13 +60,11 @@ def estimate_snr(means, variances, weights):
     snr = 10 * np.log10((speech_mean - noise_mean)**2 / (noise_var + speech_var))
     return snr
 
-
-def gaussian_mixture_snr(noisy_signal, frame_length=128, hop_length=64, plot=False):
+@read_audio
+def gaussian_mixture_snr(noisy_signal, sample_rate=16000, frame_length=128, hop_length=64, plot=False):
     """
     Perform Gaussian Mixture Model (GMM) based SNR estimation of a noisy signal.
     """
-    if type(noisy_signal) == type(""):
-        noisy_signal = sf.read(noisy_signal)[0]
     # Step 1: Compute log-power
     log_power = compute_log_power(noisy_signal)
 

@@ -9,6 +9,7 @@ from scipy.signal import stft
 from gammatone import gtgram
 from .utils import calculate_true_snr
 import soundfile as sf
+from .utils import read_audio
 
 def erb_to_hz(erb):
     """Convert ERB scale to Hz"""
@@ -163,7 +164,6 @@ def snr_ibm_estimator_generic(noisy_signal, estimate_ibm_func, sr=16000):
 
     # Step 3: Estimate noise profile
     noise_profile = estimate_noise_profile(normalized_coch)
-    print("Noise profile: ", noise_profile.shape)
     
     # Step 4: Estimate IBM
     ibm_estimated = estimate_ibm_func(normalized_coch, noise_profile)
@@ -177,20 +177,19 @@ def snr_ibm_estimator_generic(noisy_signal, estimate_ibm_func, sr=16000):
     # Return the estimated SNR
     return broadband_estimated_snr
 
-def simple_ibm_snr_estimator(noisy_signal, sr=16000):
+@read_audio
+def simple_ibm_snr_estimator(noisy_signal, sample_rate=16000):
     """
     Simple IBM SNR estimator using the simple IBM estimation
     
     Args:
         noisy_signal: numpy array of the noisy signal
-        sr: sampling rate of the signal
+        sample_rate: sampling rate of the signal
         
     Returns:
         broadband_estimated_snr: estimated broadband SNR in dB
     """
-    if type(noisy_signal) == str:
-        noisy_signal = sf.read(noisy_signal)[0]
-    broadband_estimated_snr = snr_ibm_estimator_generic(noisy_signal, estimate_ibm_simple, sr)
+    broadband_estimated_snr = snr_ibm_estimator_generic(noisy_signal, estimate_ibm_simple, sample_rate)
     return broadband_estimated_snr
 
 def true_ibm_snr_estimator(signal, noise, sr=16000):

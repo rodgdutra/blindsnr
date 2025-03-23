@@ -1,4 +1,5 @@
 import numpy as np
+import soundfile as sf
 
 def generate_noisy_signal(desired_snr, signal, noise):
     """
@@ -64,3 +65,54 @@ def calculate_true_snr(signal_audio, noise_audio):
     snr_db = 10 * np.log10(signal_power / noise_power)
 
     return snr_db
+
+
+def normalize_to_neg1_pos1(array):
+    """
+    Normalize an array to the range [-1, 1].
+    
+    Parameters:
+        array (np.ndarray): Input array to be normalized.
+        
+    Returns:
+        np.ndarray: Normalized array with values in the range [-1, 1].
+    """
+    # Find the minimum and maximum values of the array
+    min_val = np.min(array)
+    max_val = np.max(array)
+    
+    # Handle the edge case where all elements are the same
+    if min_val == max_val:
+        return np.zeros_like(array)  # Return an array of zeros
+    
+    # Normalize to [0, 1] first
+    normalized = (array - min_val) / (max_val - min_val)
+    
+    # Scale to [-1, 1]
+    normalized = 2 * normalized - 1
+    
+    return normalized
+
+def read_audio(func):
+    """
+    A decorator to handle reading audio files if the input is a string (file path).
+    If the input is not a string, it assumes the input is already an audio signal.
+    """
+    def wrapper(input_wav, *args, **kwargs):
+        # Check if the input is a string (assumed to be a file path)
+        if isinstance(input_wav, str):
+            try:
+                # Read the audio file using soundfile
+                audio_data, sample_rate = sf.read(input_wav)
+                audio_data = normalize_to_neg1_pos1(audio_data)
+            except Exception as e:
+                raise ValueError(f"Failed to load audio file '{input_wav}'. Error: {e}")
+        else:
+            # Assume the input is already an audio signal (e.g., NumPy array)
+            audio_data = input_wav
+            sample_rate = None  # No sample rate provided for pre-loaded audio
+        
+        # Call the original function with the audio data and any additional arguments
+        return func(audio_data, sample_rate=sample_rate, *args, **kwargs)
+    
+    return wrapper

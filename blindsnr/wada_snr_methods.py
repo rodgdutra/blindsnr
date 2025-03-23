@@ -12,6 +12,8 @@ from scipy.optimize import minimize
 #!/usr/bin/env python3
 import numpy as np
 import soundfile as sf
+from .utils import read_audio
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,66 +34,6 @@ The python implementation in wada_simplified was originally implemented here: ht
 the author is @peter-grajcar.
 """
 
-def wada_alternative(noisy_wav, sampling_rate=16000):
-    """
-    Estimate SNR using the WADA-SNR algorithm.
-    
-    Parameters:
-        signal (np.ndarray): Noisy speech signal.
-        sampling_rate (int): Sampling rate of the signal (default: 16000 Hz).
-    
-    Returns:
-        float: Estimated SNR in dB.
-    """
-    noisy_wav = sf.read(noisy_wav)[0]
-    # Step 1: Compute the absolute amplitude of the signal
-    abs_signal = np.abs(noisy_wav)
-    
-    # Step 2: Define the Gamma distribution for clean speech
-    def gamma_pdf(x, shape, scale):
-        return gamma.pdf(x, shape, scale=scale)
-    
-    # Step 3: Define the Gaussian distribution for noise
-    def gaussian_pdf(x, mean, std):
-        return norm.pdf(x, loc=mean, scale=std)
-    
-    # Step 4: Define the mixture model (Gamma + Gaussian)
-    def mixture_model(x, params):
-        shape, scale, mean, std, weight = params
-        return weight * gamma_pdf(x, shape, scale) + (1 - weight) * gaussian_pdf(x, mean, std)
-    
-    # Step 5: Negative log-likelihood function for optimization
-    def neg_log_likelihood(params):
-        return -np.sum(np.log(mixture_model(abs_signal, params) + 1e-10))
-    
-    # Step 6: Initial parameter guesses
-    initial_params = [
-        2.0,  # Shape of Gamma distribution
-        0.1,  # Scale of Gamma distribution
-        0.0,  # Mean of Gaussian distribution
-        0.1,  # Std of Gaussian distribution
-        0.5   # Weight of Gamma distribution
-    ]
-    
-    # Step 7: Optimize parameters using maximum likelihood estimation
-    result = minimize(neg_log_likelihood, initial_params, bounds=[
-        (1e-3, None),  # Shape > 0
-        (1e-3, None),  # Scale > 0
-        (None, None),  # Mean (unbounded)
-        (1e-3, None),  # Std > 0
-        (0, 1)         # Weight [0, 1]
-    ])
-    
-    # Extract optimized parameters
-    shape, scale, mean, std, weight = result.x
-    
-    # Step 8: Estimate SNR
-    speech_power = gamma.mean(shape, scale=scale)**2
-    noise_power = std**2
-    snr_linear = speech_power / noise_power
-    snr_db = 10 * np.log10(snr_linear)
-    
-    return snr_db
 
 def wada_snr_block(wav, epsilon=1e-10):
     """
@@ -141,11 +83,19 @@ def wada_snr_block(wav, epsilon=1e-10):
 
     return signal_energy, noise_energy
 
-def wada_simplified(wav):
+@read_audio
+def wada_simplified(wav, sample_rate=16000, blocksize=100000):
     acc_signal_energy = 0
     acc_noise_energy = 0
 
-    for block in sf.blocks(wav, blocksize=100000):
+    # if type(wav) == str:
+    #     for block in sf.blocks(wav, blocksize=blocksize):
+    #         signal_energy, noise_energy = wada_snr_block(block)
+    #         acc_signal_energy += signal_energy
+    #         acc_noise_energy += noise_energy
+    # else:
+    for i in range(len(wav)//blocksize + 1):
+        block = wav[i*blocksize:(i+1)*blocksize]
         signal_energy, noise_energy = wada_snr_block(block)
         acc_signal_energy += signal_energy
         acc_noise_energy += noise_energy
