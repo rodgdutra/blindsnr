@@ -231,9 +231,10 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
     # Histogram
     hvals = np.linspace(LOW, HIGH, BINS + 1)
     power_hist, _ = np.histogram(Pdb, bins=hvals)
-    print(" power hist max: ", max(power_hist))
-    print(" power shape ", power_hist.shape)
-    
+    if verbose:
+        print(" power hist max: ", max(power_hist))
+        print(" power shape ", power_hist.shape)
+        
     
 
     # stnr -c algorithm
@@ -313,12 +314,12 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
             print("Can't find first trough. I'll do my best from here...")
 
         temp_unspiked_hist = np.copy(unspiked_hist)
-        # for i in range(first_peak):
-        #     temp_unspiked_hist[i] = 0
+
         cross_lvl = -np.inf
         speech_lvl = percentile_hist(temp_unspiked_hist, BINS, PEAK_LEVEL, LOW, HIGH)
-        print("speech_lvl ",speech_lvl)
-        print("noise_lvl", noise_lvl)
+        if verbose:
+            print("speech_lvl ",speech_lvl)
+            print("noise_lvl", noise_lvl)
         
         S = speech_lvl - noise_lvl
         return S
