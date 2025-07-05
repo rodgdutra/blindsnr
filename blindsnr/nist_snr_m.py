@@ -2,48 +2,8 @@ import numpy as np
 from scipy.signal import convolve, medfilt
 import matplotlib.pyplot as plt
 from .utils.audio_utils import read_audio
-
-
-def medianf(X, W):
-    """
-    Applies a 1D median filter to the input array X.
-
-    Args:
-        X (numpy.ndarray): The input array. If 1D, the filter is applied to it directly.
-                           If 2D, the filter is applied to each row independently.
-        W (int): The size of the median filter window.
-
-    Returns:
-        numpy.ndarray: The array after applying the median filter.
-    """
-    if X.ndim == 1:
-        X_reshaped = X.reshape(1, -1)  # Reshape 1D array to a single row 2D array
-        num_cols = X_reshaped.shape[1]
-        num_rows = X_reshaped.shape[0]
-        R = np.zeros_like(X_reshaped, dtype=np.float64)
-        w2 = int(np.floor(W / 2))
-        xx = np.pad(X_reshaped, ((0, 0), (w2, w2)), mode='constant')
-
-        for c in range(num_cols):
-            window = xx[:, c : c + W]
-            median_values = np.median(window, axis=1)
-            R[:, c] = median_values
-
-        return R.flatten()  # Flatten the result back to 1D
-    elif X.ndim == 2:
-        num_cols = X.shape[1]
-        num_rows = X.shape[0]
-        R = np.zeros_like(X, dtype=np.float64)
-        w2 = int(np.floor(W / 2))
-        xx = np.pad(X, ((0, 0), (w2, w2)), mode='constant')
-
-        for c in range(num_cols):
-            window = xx[:, c : c + W]
-            median_values = np.median(window, axis=1)
-            R[:, c] = median_values
-        return R
-    else:
-        raise ValueError("Input array must be 1D or 2D.")
+from .utils.matlab_to_numpy import medianf
+from .utils.logging_utils  import logger
 
 def locate_extremum(h, from_idx, to_idx, extremum_type):
     """
@@ -152,7 +112,7 @@ def pick_center(h, bin_index, low=-28.125, high=96.875, bins=500):
     """
     step = (high - low) / bins
     center = low + step * (bin_index + 0.5)
-    print(center)
+    logger.debug(f"Bin center: {center}")
     return center
 
 def percentile_hist(h, bins, percent, low=-28.125, high=96.875):
@@ -171,9 +131,9 @@ def percentile_hist(h, bins, percent, low=-28.125, high=96.875):
     """
     cumulative_sum = np.cumsum(h)
     bin_index = np.where(cumulative_sum >= percent * cumulative_sum[-1])[0][0]
-    print("max hist: ", max(h))
-    print("bin_index: ", bin_index)
-    print("cumulative_sum: ", cumulative_sum[-1])
+    logger.debug(f"max hist: {max(h)}")
+    logger.debug(f"bin_index: {bin_index}")
+    logger.debug(f"cumulative_sum: {cumulative_sum[-1]}")
     
     return pick_center(h, bin_index, low, high, bins)
 
@@ -215,11 +175,11 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
     frame_width = int(sample_rate / 1000 * MILI_SEC)
     frame_adv = int(frame_width / 2)
 
-    print(max(noisy_signal))
+    logger.debug(f"Max signal value: {max(noisy_signal)}")
 
     # calculate power, assuming short samples
     D2 = (noisy_signal * 16384) ** 2
-    print(max(D2))
+    logger.debug(f"Max squared signal value: {max(D2)}")
 
     nhops = int(len(D2) / frame_adv)
     D2_reshaped = D2[:nhops * frame_adv].reshape(nhops, frame_adv).T
@@ -232,8 +192,8 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
     hvals = np.linspace(LOW, HIGH, BINS + 1)
     power_hist, _ = np.histogram(Pdb, bins=hvals)
     if verbose:
-        print(" power hist max: ", max(power_hist))
-        print(" power shape ", power_hist.shape)
+        logger.debug(f"Power hist max: {max(power_hist)}")
+        logger.debug(f"Power shape: {power_hist.shape}")
         
     
 
@@ -289,8 +249,8 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
                 second_trough = locate_extremum(smoothed_hist, second_peak + 1, BINS, TROUGH)
 
     if verbose:
-        print(
-            'peak=%d (%5.2f) trough=%d (%5.2f) peak=%d (%5.2f) trough=%d (%5.2f)' % (
+        logger.debug(
+            'Peak=%d (%5.2f) trough=%d (%5.2f) peak=%d (%5.2f) trough=%d (%5.2f)' % (
                 first_peak,
                 pick_center(smoothed_hist, first_peak, LOW, HIGH, BINS) if first_peak <= BINS else np.nan,
                 first_trough,
@@ -304,22 +264,22 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
 
     if first_peak == BINS:
         if verbose:
-            print("I can't find the first peak of the power distribution. Is this a null file?")
+            logger.warning("Can't find first peak of power distribution - possible null file")
         return np.nan
 
     noise_lvl = pick_center(smoothed_hist, first_peak, LOW, HIGH, BINS)
 
     if first_trough == BINS:
         if verbose:
-            print("Can't find first trough. I'll do my best from here...")
+            logger.info("Can't find first trough - using fallback method")
 
         temp_unspiked_hist = np.copy(unspiked_hist)
 
         cross_lvl = -np.inf
         speech_lvl = percentile_hist(temp_unspiked_hist, BINS, PEAK_LEVEL, LOW, HIGH)
         if verbose:
-            print("speech_lvl ",speech_lvl)
-            print("noise_lvl", noise_lvl)
+            logger.debug(f"Speech level: {speech_lvl}")
+            logger.debug(f"Noise level: {noise_lvl}")
         
         S = speech_lvl - noise_lvl
         return S
@@ -330,7 +290,7 @@ def nist_stnr_m(noisy_signal, sample_rate=16000, doplot=0, verbose=0):
 
     if second_peak == BINS:
         if verbose:
-            print("Can't find second peak.")
+            logger.info("Can't find second peak - using fallback method")
 
         cross_lvl = -np.inf
         speech_lvl = percentile_hist(temp_unspiked_hist, BINS, PEAK_LEVEL, LOW, HIGH)

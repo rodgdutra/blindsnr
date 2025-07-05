@@ -7,9 +7,10 @@ import librosa
 import numpy as np
 from scipy.signal import stft
 from gammatone import gtgram
-from .utils import calculate_true_snr
+from .utils import calculate_true_snr, read_audio
 import soundfile as sf
-from .utils import read_audio
+from .utils.logging_utils  import logger
+
 
 def erb_to_hz(erb):
     """Convert ERB scale to Hz"""
@@ -235,8 +236,8 @@ def true_ibm_snr_estimator(signal, noise, sr=16000):
 if __name__ == "__main__":
     # Load example audio (replace with your noisy speech file)
     signal, sr = librosa.load(librosa.example('trumpet'), sr=16000)
-    print(f"Signal length: {len(signal)} samples")
-    print(f"Sample rate: {sr} Hz")
+    logger.info(f"Signal length: {len(signal)} samples")
+    logger.info(f"Sample rate: {sr} Hz")
     noise = np.random.normal(0, 0.1, len(signal))
     noisy_signal = signal + noise
     
@@ -246,14 +247,14 @@ if __name__ == "__main__":
     cochleagram_signal_half = compute_gammatone_erb(signal[:len(signal)//2], sr)
     
     
-    print("cochleagram computed: ", cochleagram.shape)
+    logger.debug("cochleagram computed: %s", cochleagram.shape)
     normalized_coch = normalize_filterbank(cochleagram)
-    print("normalized cochleagram  computed: ", normalized_coch.shape)
+    logger.debug("normalized cochleagram computed: %s", normalized_coch.shape)
     ibm = compute_true_ibm(signal, noise, 16000)
     
     # Step 2: Estimate noise profile
     noise_profile = estimate_noise_profile(normalized_coch)
-    print("Noise profile: ", noise_profile.shape)
+    logger.debug("Noise profile shape: %s", noise_profile.shape)
     
     # Step 3: Estimate IBM
     ibm_estimated = estimate_ibm_simple(normalized_coch, noise_profile)
@@ -285,12 +286,12 @@ if __name__ == "__main__":
     broadband_snr = snr_transform(filtered_snr, noise_profile)
     
     
-    print(f"Filtered SNR: {filtered_snr:.2f} dB")
-    print(f"Broadband SNR: {broadband_snr:.2f} dB")
+    logger.info(f"Filtered SNR: {filtered_snr:.2f} dB")
+    logger.info(f"Broadband SNR: {broadband_snr:.2f} dB")
         
-    print(f"Filtered estimated SNR: {filtered_estimated_snr:.2f} dB")
-    print(f"Estimated Broadband SNR: {broadband_estimated_snr:.2f} dB")
-    print(f"True SNR: {calculate_true_snr(signal, noise)} dB")
+    logger.info(f"Filtered estimated SNR: {filtered_estimated_snr:.2f} dB")
+    logger.info(f"Estimated Broadband SNR: {broadband_estimated_snr:.2f} dB")
+    logger.info(f"True SNR: {calculate_true_snr(signal, noise)} dB")
     
     
     # # Visualization

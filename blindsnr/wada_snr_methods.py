@@ -13,11 +13,7 @@ from scipy.optimize import minimize
 import numpy as np
 import soundfile as sf
 from .utils import read_audio
-
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .utils.logging_utils import logger
 
 # next 2 lines define a fancy curve derived from a gamma distribution -- see paper
 db_vals = np.arange(-20, 101)
@@ -101,4 +97,5 @@ def wada_simplified(wav, sample_rate=16000, blocksize=100000):
         acc_noise_energy += noise_energy
 
     snr = 10 * np.log10(acc_signal_energy / acc_noise_energy)
+    logger.info(f"Estimated SNR: {snr:.2f} dB")
     return snr
